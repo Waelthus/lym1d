@@ -6,6 +6,14 @@ Emulator based on simulations run with the Nyx code, using the emulator_george_b
 
 import numpy as np
 from .emulator_Nyx_george_backend import create_emulator
+try:
+    from .emulator_Nyx_gpytorch_backend import create_emulator as create_emulator_gpytorch
+except ImportError:
+   no_gpytorch=True
+   print("pytorch based emulator not available, will not be able to use it")
+else:
+    no_gpytorch=False
+
 from .emulator import EmulatorBase, EmulatorOutOfBoundsException
 import h5py
 import copy
@@ -320,21 +328,38 @@ class Emulator_Nyx(EmulatorBase):
         for z in modelset.model_grid_redshifts:
             params,k,pk=modelset[z]
             smooth_lengths = np.array(5*params.std(axis=0))
-            emu, update_emu, emupars, emuparnames = create_emulator(
-                params,
-                pk if not self.uselogpower else np.log10(pk),
-                smooth_lengths,
-                noise=(1e-8 if not self.varywhitenoise else None),
-                npc=npc,
-                optimize=True,
-                output_cov=self.output_cov,
-                sigma_0=np.sqrt(
-                    1
-                ),  # this allows training the signal variance (doesn't properly work on small datasets with PCA)
-                #sigma_l=np.sqrt(0.1),            #this allows adding a dot-kernel corresponding to linear interpolation
-                noPCA=not (self.usepca),
-                kerneltype="SE" if not (self.usematern) else "M52",
-            )
+            if no_gpytorch:
+                emu, update_emu, emupars, emuparnames = create_emulator(
+                    params,
+                    pk if not self.uselogpower else np.log10(pk),
+                    smooth_lengths,
+                    noise=(1e-8 if not self.varywhitenoise else None),
+                    npc=npc,
+                    optimize=True,
+                    output_cov=self.output_cov,
+                    sigma_0=np.sqrt(
+                        1
+                    ),  # this allows training the signal variance (doesn't properly work on small datasets with PCA)
+                    #sigma_l=np.sqrt(0.1),            #this allows adding a dot-kernel corresponding to linear interpolation
+                    noPCA=not (self.usepca),
+                    kerneltype="SE" if not (self.usematern) else "M52",
+                )
+            else:
+                emu, update_emu, emupars, emuparnames = create_emulator_gpytorch(
+                    params,
+                    pk if not self.uselogpower else np.log10(pk),
+                    smooth_lengths,
+                    noise=(1e-8 if not self.varywhitenoise else None),
+                    npc=npc,
+                    optimize=True,
+                    output_cov=self.output_cov,
+                    sigma_0=np.sqrt(
+                        1
+                    ),  # this allows training the signal variance (doesn't properly work on small datasets with PCA)
+                    #sigma_l=np.sqrt(0.1),            #this allows adding a dot-kernel corresponding to linear interpolation
+                    noPCA=not (self.usepca),
+                    kerneltype="SE" if not (self.usematern) else "M52",
+                )
             karr.append(k[0])
             emuparnames=np.array(emuparnames,dtype='<U50')
             for i,e in enumerate(emuparnames):
