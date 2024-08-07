@@ -211,15 +211,12 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
 
     npcmax = len(PC)
 
-    if sigma_0==0:
-        sigma_0 = torch.tensor(np.repeat(1e-5,par_grid.shape[0]), dtype=torch.float32)  # A small default noise value
+    if noise is None:
+        noise = torch.tensor(np.repeat(1e-5,par_grid.shape[0]), dtype=torch.float32)
         train_noise=True
-    elif sigma_0 is None:
-        sigma_0 = torch.tensor(np.repeat(1e-5,par_grid.shape[0]), dtype=torch.float32)
-        train_noise=False
     else:
-        sigma_0 = torch.tensor(np.repeat(sigma_0,par_grid.shape[0]), dtype=torch.float32)
-        train_noise=True
+        noise = torch.tensor(np.repeat(noise,par_grid.shape[0]), dtype=torch.float32)
+        train_noise=False
 
 
     # Convert data to torch tensors
@@ -233,7 +230,7 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
 
         # Create likelihood and model
         #likelihood = gpytorch.likelihoods.GaussianLikelihood(noise_constraint=gpytorch.constraints.GreaterThan(noise))
-        likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=sigma_0**2, learn_additional_noise=train_noise)
+        likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=noise**2, learn_additional_noise=train_noise)
 
         gp_model = ExactGPModel(train_x, train_y, likelihood, kerneltype=kerneltype, smooth_lengths=smooth_lengths, sigma_l=sigma_l, sigma_0=sigma_0)
 
