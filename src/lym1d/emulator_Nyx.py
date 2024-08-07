@@ -327,7 +327,7 @@ class Emulator_Nyx(EmulatorBase):
         emupararrlist=[]
         for z in modelset.model_grid_redshifts:
             params,k,pk=modelset[z]
-            smooth_lengths = np.array(5*params.std(axis=0))
+            smooth_lengths = np.array(params.std(axis=0))
             if no_gpytorch:
                 emu, update_emu, emupars, emuparnames = create_emulator(
                     params,
