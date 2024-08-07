@@ -36,14 +36,14 @@ def predict_weights_func(x, npc, gparr, output_cov=False):
     new_weights = []
     new_var = []
     x = torch.tensor(x, dtype=torch.float32)
-
     for gp_model, gp_likelihood in gparr[:npc]:
-        gp_model.eval()
-        with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            pred = gp_model(x)
-            new_weights.append(pred.mean.numpy())  
-            if output_cov:
-                new_var.append(pred.variance.numpy())     #could also do the full covariances when changing the model to a multioutput using pred.covariance_matrix
+      gp_model.eval()
+      gp_likelihood.eval()
+      with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        pred = gp_likelihood(gp_model(x))
+        new_weights.append(pred.mean.numpy())  
+        if output_cov:
+          new_var.append(pred.variance.numpy())     #could also do the full covariances when changing the model to a multioutput using pred.covariance_matrix
 
     return np.array(new_weights), np.array(new_var)
 
@@ -244,7 +244,6 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
 
         gparr.append((gp_model, likelihood))
 
-    resultsarr = results
     # generate a function to predict PCA weights using the GP objects just created
     predict_weights = ft.partial(predict_weights_func, gparr=gparr, ww=ww, output_cov=output_cov)
     # using this function generate an emulator of the statistics
