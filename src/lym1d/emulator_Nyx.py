@@ -349,7 +349,7 @@ class Emulator_Nyx(EmulatorBase):
                     params,
                     pk if not self.uselogpower else np.log10(pk),
                     smooth_lengths,
-                    noise=1e-3,#(1e-8 if not self.varywhitenoise else None),
+                    noise=1e-1,#(1e-8 if not self.varywhitenoise else None),
                     npc=npc,
                     optimize=True,
                     output_cov=self.output_cov,
