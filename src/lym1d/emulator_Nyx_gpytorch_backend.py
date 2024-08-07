@@ -140,10 +140,10 @@ class ExactGPModel(gpytorch.models.ExactGP):
         
         
         if sigma_l is not None:
-            self.covar_module += sigma_l ** 2 * gpytorch.kernels.LinearKernel()             #not sure how to put in sigma_l her
+            self.covar_module += gpytorch.kernels.LinearKernel()             #not sure how to put in sigma_l her
         self.covar_module=gpytorch.kernels.ScaleKernel(self.covar_module)
         if sigma_0 is not None:
-            self.covar_module += sigma_0 * gpytorch.kernels.ConstantKernel()         #not sure how to put in sigma_0 here, maybe as prior, also this might not really be needed due to the scale kernel
+          self.covar_module +=  gpytorch.kernels.ConstantKernel( )         #not sure how to put in sigma_0 here, maybe as prior, also this might not really be needed due to the scale kernel
         
         self.mean_module = gpytorch.means.ConstantMean()
 
