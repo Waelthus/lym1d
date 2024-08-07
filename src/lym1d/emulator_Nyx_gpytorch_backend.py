@@ -132,11 +132,11 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kerneltype='SE', smooth_lengths=1.0, sigma_l=None, sigma_0=None):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         if kerneltype == 'SE':
-            self.covar_module = gpytorch.kernels.RBFKernel(lengthscale=torch.tensor(smooth_lengths),ard_num_dims=train_x.shape[1])
+            self.covar_module = gpytorch.kernels.RBFKernel(lengthscale=torch.tensor(smooth_lengths),lengthscale_constraint=gpytorch.constraints.GreaterThan(1e-1),ard_num_dims=train_x.shape[1])
         elif kerneltype == 'M52':
-            self.covar_module = gpytorch.kernels.MaternKernel(nu=2.5, lengthscale=torch.tensor(smooth_lengths),ard_num_dims=train_x.shape[1])
+            self.covar_module = gpytorch.kernels.MaternKernel(nu=2.5,lengthscale_constraint=gpytorch.constraints.GreaterThan(1e-1), lengthscale=torch.tensor(smooth_lengths),ard_num_dims=train_x.shape[1])
         elif kerneltype == 'M32':
-            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5, lengthscale=torch.tensor(smooth_lengths),ard_num_dims=train_x.shape[1])
+            self.covar_module = gpytorch.kernels.MaternKernel(nu=1.5,lengthscale_constraint=gpytorch.constraints.GreaterThan(1e-1), lengthscale=torch.tensor(smooth_lengths),ard_num_dims=train_x.shape[1])
         
         
         if sigma_l is not None:
