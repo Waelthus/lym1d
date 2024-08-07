@@ -138,10 +138,10 @@ class ExactGPModel(gpytorch.models.ExactGP):
         elif kerneltype == 'M32':
             self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5, lengthscale=smooth_lengths))
         
-        if sigma_0 is not None:
-            self.covar_module *= sigma_0 ** 2
-        if sigma_l is not None:
-            self.covar_module += sigma_l ** 2 * gpytorch.kernels.LinearKernel()
+        #if sigma_0 is not None:
+        #    self.covar_module *= gpytorch.kernels.ConstantKernel()         #not sure how to put in sigma_0 here
+        #if sigma_l is not None:
+        #    self.covar_module += sigma_l ** 2 * gpytorch.kernels.LinearKernel()             #not sure how to put in sigma_l here
             
         self.mean_module = gpytorch.means.ConstantMean()
 
@@ -228,7 +228,7 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
         gp_model = ExactGPModel(train_x, train_y, likelihood, kerneltype=kerneltype, smooth_lengths=smooth_lengths, sigma_l=sigma_l, sigma_0=sigma_0)
 
         if optimize:
-            print("training gp model {i}")
+            print(f"training gp model {i}")
             gp_model.train()
             likelihood.train()
 
@@ -245,7 +245,7 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
                 loss = -mll(output, train_y)
                 loss.backward()
                 optimizer.step()
-            print("training gp model {i} done!")
+            print(f"training gp model {i} done!")
         gparr.append((gp_model, likelihood))
 
     # generate a function to predict PCA weights using the GP objects just created
