@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 
-Backend to implement a general Gaussian-Process based emulator with the underlying george kernels, and perform the relevant GP operations.
+Backend to implement a general Gaussian-Process based emulator with the underlying gpytorch kernels, and perform the relevant GP operations.
 Allows for a possible PCA decomposition of the training set as well.
 
 Created 2019
@@ -18,6 +18,7 @@ import torch
 import gpytorch
 import numpy as np
 import scipy.optimize as op
+from tqdm import trange
 
 def predict_weights_func(x, npc, gparr, output_cov=False):
     """
@@ -218,6 +219,8 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
     gparr = []
 
     for i, w in enumerate(ww):
+        
+        print("generating gp model {i}")
         train_y = torch.tensor(w, dtype=torch.float32)
 
         # Create likelihood and model
@@ -225,6 +228,7 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
         gp_model = ExactGPModel(train_x, train_y, likelihood, kerneltype=kerneltype, smooth_lengths=smooth_lengths, sigma_l=sigma_l, sigma_0=sigma_0)
 
         if optimize:
+            print("training gp model {i}")
             gp_model.train()
             likelihood.train()
 
@@ -235,13 +239,13 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
             mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, gp_model)
 
             training_iterations = 50
-            for _ in range(training_iterations):
+          for _ in trange(training_iterations,desc='Training GP model, step:'):
                 optimizer.zero_grad()
                 output = gp_model(train_x)
                 loss = -mll(output, train_y)
                 loss.backward()
                 optimizer.step()
-
+            print("training gp model {i} done!")
         gparr.append((gp_model, likelihood))
 
     # generate a function to predict PCA weights using the GP objects just created
