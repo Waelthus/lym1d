@@ -225,7 +225,7 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
 
         # Create likelihood and model
         #likelihood = gpytorch.likelihoods.GaussianLikelihood(noise_constraint=gpytorch.constraints.GreaterThan(noise))
-        likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=sigma_0)
+        likelihood = gpytorch.likelihoods.FixedNoiseGaussianLikelihood(noise=sigma_0**2)
 
         gp_model = ExactGPModel(train_x, train_y, likelihood, kerneltype=kerneltype, smooth_lengths=smooth_lengths, sigma_l=sigma_l, sigma_0=sigma_0)
 
