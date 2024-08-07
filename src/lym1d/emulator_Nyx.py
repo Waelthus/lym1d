@@ -353,7 +353,7 @@ class Emulator_Nyx(EmulatorBase):
                     npc=npc,
                     optimize=True,
                     output_cov=self.output_cov,
-                    sigma_0=None#np.sqrt(
+                    sigma_0=None,#np.sqrt(
                         #1
                     #),  # this allows training the signal variance (doesn't properly work on small datasets with PCA)
                     #sigma_l=np.sqrt(0.1),            #this allows adding a dot-kernel corresponding to linear interpolation
