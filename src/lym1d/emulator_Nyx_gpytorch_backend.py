@@ -239,7 +239,7 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
             mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, gp_model)
 
             training_iterations = 50
-          for _ in trange(training_iterations,desc='Training GP model, step:'):
+            for _ in trange(training_iterations,desc='Training GP model, step:'):
                 optimizer.zero_grad()
                 output = gp_model(train_x)
                 loss = -mll(output, train_y)
