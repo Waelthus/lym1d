@@ -253,8 +253,8 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
     # using this function generate an emulator of the statistics
     emulator = ft.partial(emulator_func, mean=mean_stat, std=std_stat, pca=PC,
                           predict_new_weights=predict_weights, npcmax=npcmax, output_cov=output_cov)
-   
-    parnames, pararr = list(*zip([name,param] for name, param in gp_model.named_parameters()))
+    parnames=list(zip(*gp_model.named_parameters()))[0]
+    pararr = [list(zip(*gp_model.named_parameters()))[1] for gp_model,_ in gparr]
     outentries = [emulator, None, pararr, parnames]
 
     return outentries
