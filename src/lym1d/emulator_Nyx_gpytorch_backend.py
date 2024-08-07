@@ -132,11 +132,11 @@ class ExactGPModel(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood, kerneltype='SE', smooth_lengths=1.0, sigma_l=None, sigma_0=None):
         super(ExactGPModel, self).__init__(train_x, train_y, likelihood)
         if kerneltype == 'SE':
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(lengthscale=smooth_lengths,ard_num_dims=train_x.shape[1])+ gpytorch.kernels.LinearKernel()) + gpytorch.kernels.ConstantKernel()
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel(lengthscale=torch.tensor(smooth_lengths),ard_num_dims=train_x.shape[1])+ (sigma_l**2 * gpytorch.kernels.LinearKernel() if sigma_l is not None else 0)) + (sigma_0**2 * gpytorch.kernels.ConstantKernel() if sigma_0 is not None else 0)
         elif kerneltype == 'M52':
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=2.5, lengthscale=smooth_lengths,ard_num_dims=train_x.shape[1])+ gpytorch.kernels.LinearKernel()) + gpytorch.kernels.ConstantKernel()
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=2.5, lengthscale=torch.tensor(smooth_lengths),ard_num_dims=train_x.shape[1])+ (sigma_l**2 * gpytorch.kernels.LinearKernel() if sigma_l is not None else 0)) + (sigma_0**2 * gpytorch.kernels.ConstantKernel() if sigma_0 is not None else 0)
         elif kerneltype == 'M32':
-            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5, lengthscale=smooth_lengths,ard_num_dims=train_x.shape[1])+ gpytorch.kernels.LinearKernel()) + gpytorch.kernels.ConstantKernel()
+            self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.MaternKernel(nu=1.5, lengthscale=torch.tensor(smooth_lengths),ard_num_dims=train_x.shape[1])+ gpytorch.kernels.LinearKernel()) + (sigma_l**2 * gpytorch.kernels.LinearKernel() if sigma_l is not None else 0)) + (sigma_0**2 * gpytorch.kernels.ConstantKernel() if sigma_0 is not None else 0)
         
         #if sigma_0 is not None:
         #    self.covar_module *= gpytorch.kernels.ConstantKernel()         #not sure how to put in sigma_0 here, maybe as prior, also this might not really be needed due to the scale kernel
