@@ -212,13 +212,13 @@ def create_emulator(par_grid, stat_grid, smooth_lengths, noise=None, npc=5, opti
     npcmax = len(PC)
 
     if sigma_0==0:
-        sigma_0 = torch.tensor(1e-5, dtype=torch.float32)  # A small default noise value
+        sigma_0 = torch.tensor(np.repeat(1e-5,par_grid.shape[0]), dtype=torch.float32)  # A small default noise value
         train_noise=True
     elif sigma_0 is None:
-        sigma_0 = torch.tensor(1e-5, dtype=torch.float32)
+        sigma_0 = torch.tensor(np.repeat(1e-5,par_grid.shape[0]), dtype=torch.float32)
         train_noise=False
     else:
-        sigma_0 = torch.tensor(sigma_0, dtype=torch.float32)
+        sigma_0 = torch.tensor(np.repeat(sigma_0,par_grid.shape[0]), dtype=torch.float32)
         train_noise=True
 
 
