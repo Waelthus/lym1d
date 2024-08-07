@@ -349,13 +349,13 @@ class Emulator_Nyx(EmulatorBase):
                     params,
                     pk if not self.uselogpower else np.log10(pk),
                     smooth_lengths,
-                    noise=(1e-8 if not self.varywhitenoise else None),
+                    noise=1e-3,#(1e-8 if not self.varywhitenoise else None),
                     npc=npc,
                     optimize=True,
                     output_cov=self.output_cov,
-                    sigma_0=np.sqrt(
-                        1
-                    ),  # this allows training the signal variance (doesn't properly work on small datasets with PCA)
+                    sigma_0=None#np.sqrt(
+                        #1
+                    #),  # this allows training the signal variance (doesn't properly work on small datasets with PCA)
                     #sigma_l=np.sqrt(0.1),            #this allows adding a dot-kernel corresponding to linear interpolation
                     noPCA=not (self.usepca),
                     kerneltype="SE" if not (self.usematern) else "M52",
