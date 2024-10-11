@@ -23,6 +23,8 @@ from .emulator import EmulatorOutOfBoundsException
 from scipy.interpolate import CubicSpline as interp
 from scipy.interpolate import interp1d as interp_lin
 
+c_kms = 299792.458
+
 
 # Different interpolation methods that can be used on the final emulator outputs
 def interp_inv(x,y):
@@ -55,6 +57,8 @@ class lym1d():
     self.data_directory = os.path.join(base_directory, data_path)
     emupath = opts.pop("emupath",'Lya_emu.npz')
 
+    smartpath = opts.pop("smartpath", True)
+
     self.use_H = opts.pop('use_H',True)
     self.use_omm = opts.pop('use_omm',True)
 
@@ -72,9 +76,17 @@ class lym1d():
     self.has_cor = OptionDict({'noise':True,'DLA':True,'reso':True,'SN':True,'AGN':True,'zreio':True,'SiIII':True,'SiII':True,'norm':True,'splice':False,'UV':False,'IC':False})
     if "has_cor" in opts:
       coropts = opts.pop('has_cor')
-      if not coropts or coropts == "None": #Signal flag for setting all corrections off
+      if not coropts or coropts == "None" or coropts==False: #Signal flag for setting all corrections off
         for k,v in self.has_cor.items():
           self.has_cor[k]=False
+      elif coropts=='True' or coropts == True:
+        for k,v in self.has_cor.items():
+          self.has_cor[k]=True
+      elif isinstance(coropts,list):
+        for k,v in self.has_cor.items():
+          self.has_cor[k]=False
+        for k in coropts:
+          self.has_cor[k]=True
       else:
         self.has_cor.update(coropts) #Otherwise, the flags are set individually
 
@@ -92,12 +104,16 @@ class lym1d():
     self.agn_corr_filename = opts.pop('agn_corr_filename','AGN_corr.dat')
 
     # -> Load all relevant data (and set self.basis_z)
-    self.load_data(data_format = opts.pop('data_format','DR14'))
+    self.load_data(data_format = opts.pop('data_format','DR14'), smartpath=smartpath)
 
     self.use_flux_prior = opts.pop("use_flux_prior",False)
 
     self.emu_options = opts.pop("emulator_options",{})
     self.An_mode = opts.pop('An_mode','default') # TODO ?? : promote to emulator options??
+
+    # Check options are reasonable
+    if self.has_cor['UV'] and not "taylor" in self.runmode:
+      raise ValueError("Cannot use UV corrections in non-taylor mode")
 
     # Check all options are popped before building emulator (!)
     if opts:
@@ -238,7 +254,7 @@ class lym1d():
       if "fbar" in self.runmode:
           params.update({'Fbar':therm['Fbar'](z)})
     elif self.emutype==name_LaCE:
-      params = {'Delta2_p':cosmo['Delta2_p'](z),'n_p':cosmo['n_p'](z),'mF':therm['Fbar'](z),'sigT_Mpc':9.1*np.sqrt(therm['T0'](z)/1e4)*(1+z)/cosmo['Hubble'](z)/299792.458,'gamma':therm['gamma'](z), 'kF_Mpc':therm['kF'](z)}
+      params = {'Delta2_p':cosmo['Delta2_p'](z),'n_p':cosmo['n_p'](z),'mF':therm['Fbar'](z),'sigT_Mpc':9.1*np.sqrt(therm['T0'](z)/1e4)*(1+z)/cosmo['Hubble'](z)/c_kms,'gamma':therm['gamma'](z), 'kF_Mpc':therm['kF'](z)}
     # Check if parameters are in bounds
     try:
       self.emu.in_bounds(params,z)
@@ -425,9 +441,9 @@ class lym1d():
 
   def convert_to_functions(self, nuisance):
     nuisanceout = nuisance.copy()
-    if not callable(nuisanceout['normalization']):
+    if 'normalization' in nuisanceout and not callable(nuisanceout['normalization']):
       nuisanceout['normalization'] = interp_lin(self.basis_z, nuisanceout['normalization'])
-    if not callable(nuisanceout['noise']):
+    if 'noise' in nuisanceout and not callable(nuisanceout['noise']):
       nuisanceout['noise'] = interp_lin(self.basis_z, nuisanceout['noise'])
     return nuisanceout
 
@@ -451,7 +467,7 @@ class lym1d():
         corSplice = 1.
         if (self.splice_kind==1):
           #### TBC: TODO
-          corSplice = 1.01 + nuisance['splicing_corr'] * k
+          corSplice = 1.01 + nuisance['splicing_corr'] * ks
           #corSplice = 1.+self.SplicingOffset + self.SplicingCorr * k
         elif (self.splice_kind==2):
           z_p = 3.5
@@ -519,7 +535,7 @@ class lym1d():
       #Correction estimate from McDonald 2005 (z_reio=7 -> z_reio=17)
       if self.has_cor['zreio']:
         zvalze=[2.1,3.2,4.0]
-        Corrze = np.zeros(3)
+        Corrze = np.zeros((3, len(ks)))
         Corrze[0]= 1.001 - 1.11*ks + 15.7*ks*ks
         Corrze[1]= 1.009 - 2.29*ks + 9.39*ks*ks
         Corrze[2]= 1.029 - 3.74*ks + 4.62*ks*ks
@@ -616,10 +632,10 @@ class lym1d():
       #prior arround zreio= 10 +/- 2 (Gaussian)
       chi_squared += pow((cosmo['zreio']-10.)/2.0,2.0)
     if self.has_cor['splice']:
-      chi_squared +=  pow((nuisance['splicing_offset']-0.01)/0.05,2.0)
       if (self.splice_kind==1):
         chi_squared +=  pow((nuisance['splicing_corr']-0.0)/2.5,2.0)
       elif(self.splice_kind==2):
+        chi_squared +=  pow((nuisance['splicing_offset']-0.01)/0.05,2.0)
         chi_squared +=  pow((nuisance['splicing_corr']+0.9)/5.0,2.0)
 
     if self.use_flux_prior:
@@ -629,24 +645,38 @@ class lym1d():
 
 
 
-  def load_data(self, data_format = "DR14"):
+  def load_data(self, data_format = "DR14", smartpath = True):
     """
       Load the required data and covariance matrix from the file, making sure to cut it, and put it into the correct shapes
     """
+    fpath = self.check_path(self.data_filename, smartpath=smartpath)
+    fpath_icov = self.check_path(self.inversecov_filename, smartpath=smartpath)
 
     # -> Read power spectrum data (such as SDSS DR14 eBOSS P(k), or DESI EDR P(k))
     if data_format == "DR14":
-      z,k,Pk,sPk,nPk,bPk,tPk = np.loadtxt(os.path.join(self.data_directory,self.data_filename),unpack=True)
+      z,k,Pk,sPk,nPk,bPk,tPk = np.loadtxt(fpath,unpack=True)
+      covdata = np.loadtxt(fpath_icov)
     elif data_format == "EDR":
-      z,k,Pk,sPk = np.loadtxt(os.path.join(self.data_directory,self.data_filename),unpack=True)
+      z,k,Pk,sPk = np.loadtxt(fpath,unpack=True)
       nPk,bPk,tPk = np.zeros_like(z),np.zeros_like(z),np.zeros_like(z)
+      covdata = np.loadtxt(fpath_icov)
     elif data_format == "QMLE":
-      with open(os.path.join(self.data_directory, self.data_filename)) as f:
+      with open(fpath) as f:
         lines = (line for line in f if not line.startswith('#'))
         names = next(lines).split()
         adic = dict(zip(names, np.loadtxt(lines).T))
       z, k, Pk, sPk, nPk = adic['z'],adic['kc'],adic['Pest'],adic['ErrorP'],adic['b']
       bPk,tPk = np.zeros_like(z),np.zeros_like(z)
+      covdata = np.loadtxt(fpath_icov)
+    elif data_format == "Y1":
+      from astropy.io import fits
+      hdul = fits.open(fpath)
+      with fits.open(fpath) as hdul:
+        dat = hdul['P1D'].data
+        covdata = hdul['COVARIANCE'].data
+      z, k, Pk, sPk, tPk = dat['Z'],dat['K'],dat['PLYA'],dat['E_STAT'],dat['E_SYST']
+      nPk = (dat['PNOISE'] if 'PNOISE' in dat.names else np.zeros_like(z))
+      bPk = np.zeros_like(z)
     else:
       raise ValueError("Unrecognized data format '{}'".format(data_format))
 
@@ -654,10 +684,10 @@ class lym1d():
     # When cutting down the data, make sure to use minimal difference between any two unique elements in the data as a little buffer for float comparisons
     sorted_unique_z = np.sort(list(set(z)))
     self.epsilon_z = min(0.01,0.1*np.min(np.abs(np.diff(sorted_unique_z))))
-    self.data_zmask=(z>=self.zmin-self.epsilon_z)&(z<=self.zmax+self.epsilon_z)
-    data_z=z[self.data_zmask]
+    data_zmask=(z>=self.zmin-self.epsilon_z)&(z<=self.zmax+self.epsilon_z)
+    data_z=z[data_zmask]
 
-    # Use the data redshifts to construct an array of (!) unique z values over which we can iterate (data_z contains many copies)
+    # Use the data redshifts to construct an array of (!) unique (!) z values over which we can iterate (data_z contains many copies)
     # Careful: compared to sorted_unique_z, here we only use those elements inside [zmin, zmax]
     self.basis_z = np.sort(list(set(data_z)))
     self.Nzbin = len(self.basis_z)
@@ -686,38 +716,63 @@ class lym1d():
     self.original_iz = np.array([np.arange(len(sorted_unique_z))[np.isclose(zval,sorted_unique_z)][0] for zval in self.basis_z])
 
     # Now we can use the rest of the file content
-    data_k = k[self.data_zmask]
-    data_noise_pk = nPk[self.data_zmask]
-    data_spk = np.sqrt(sPk*sPk+tPk*tPk)[self.data_zmask] # sigma_stat^2 + sigma_sys^2
-    data_pk = Pk[self.data_zmask]
-    data_bpk = bPk[self.data_zmask]
 
-    # Now, change the shape of these components
+    # First: z-cut!
+    data_k = k[data_zmask]
+    data_noise_pk = nPk[data_zmask]
+    data_spk = np.sqrt(sPk*sPk+tPk*tPk)[data_zmask] # sigma_stat^2 + sigma_sys^2
+    data_pk = Pk[data_zmask]
+    data_bpk = bPk[data_zmask]
+
+    # Prepare for k-cut as well
+    self.data_mask = data_zmask.copy()
+
+    # Now, change the shape of all ingredients
     self.data_k, self.data_noise_pk, self.data_pk, self.data_spk, self.data_bpk = [], [], [], [], []
     self.Nkperbin = np.empty_like(self.basis_z,dtype=int)
     for iz,zval in enumerate(self.basis_z):
+      # First, locate the z value indices within the flat array
       indexes_of_z_in_flattened_array = np.isclose(data_z,zval)
-      self.data_k.append(data_k[indexes_of_z_in_flattened_array])
-      self.data_noise_pk.append(data_noise_pk[indexes_of_z_in_flattened_array])
-      self.data_pk.append(data_pk[indexes_of_z_in_flattened_array])
-      self.data_spk.append(data_spk[indexes_of_z_in_flattened_array])
-      self.data_bpk.append(data_bpk[indexes_of_z_in_flattened_array])
-      self.Nkperbin[iz] = np.count_nonzero(indexes_of_z_in_flattened_array)
-    # Let's make extra-sure we did everything correctly, and there were no issues here
-    assert(np.all(np.hstack(self.data_k)==data_k))
-    assert(np.all(np.hstack(self.data_pk)==data_pk))
-    assert(np.all(np.hstack(self.data_spk)==data_spk))
 
-    # -> Read the inverse covmat file for the covmat (IT REMAINS FLAT (!))
-    self.inv_covmat = np.loadtxt(os.path.join(self.data_directory,self.inversecov_filename))
-    # Declare inv comvat array
+      # Now, get k values at this z
+      k_values = data_k[indexes_of_z_in_flattened_array]
+
+      # Perform k-cut
+      if data_format == 'Y1':
+        self.kmin = 1e-3
+        dlambda_Lya = 0.8 # in Angstrom :  DESI specification
+        lambda_Lya = 1215.67 # in Angstrom : Lyman-Alpha wavelength
+        dv = c_kms * dlambda_Lya/(lambda_Lya*(1+zval))
+        kmax = 0.5 * np.pi/dv # Half the Nyquist frequency
+        k_mask = np.logical_and(k_values > self.kmin, k_values < kmax)
+      else:
+        k_mask = np.ones_like(k_values, dtype=bool)
+
+      # Now, store final data as ragged array
+      self.data_k.append(k_values[k_mask])
+      self.data_noise_pk.append(data_noise_pk[indexes_of_z_in_flattened_array][k_mask])
+      self.data_pk.append(data_pk[indexes_of_z_in_flattened_array][k_mask])
+      self.data_spk.append(data_spk[indexes_of_z_in_flattened_array][k_mask])
+      self.data_bpk.append(data_bpk[indexes_of_z_in_flattened_array][k_mask])
+      self.Nkperbin[iz] = np.count_nonzero(k_mask)
+
+      # Now, get final mask for flat array
+      self.data_mask[indexes_of_z_in_flattened_array] = k_mask
+
+    # Let's make extra-sure we did everything correctly, and there were no issues here
+    assert(np.array_equal(np.hstack(self.data_k),k[self.data_mask],equal_nan=True))
+    assert(np.array_equal(np.hstack(self.data_pk),Pk[self.data_mask],equal_nan=True))
+    assert(np.array_equal(np.hstack(self.data_spk),np.sqrt(sPk*sPk+tPk*tPk)[self.data_mask],equal_nan=True))
+
+    # Declare inv covmat array (FLAT!)
     try:
-      self.inv_covmat=self.inv_covmat[:,self.data_zmask]
-      self.inv_covmat=self.inv_covmat[self.data_zmask,:]
+      if data_format == 'Y1':
+        self.inv_covmat = np.linalg.inv(covdata[:,self.data_mask][self.data_mask,:])
+      else:
+        self.inv_covmat = covdata[:,self.data_mask][self.data_mask,:]
     except IndexError as e:
       raise ValueError("something went wrong when reading the covariance matrix, are data file "
-                      "and covariance file matching in length?") from e
-
+                       "and covariance file matching in length?") from e
 
 
 
@@ -733,6 +788,15 @@ class lym1d():
       self.AGN_z[i] = values[0]
       self.AGN_expansion[i] = values[1:]
     datafile.close()
+
+  def check_path(self, path, smartpath = True):
+    if os.path.exists(path) and smartpath:
+      fpath = self.data_filename
+    elif os.path.exists(os.path.join(self.data_directory,path)):
+      fpath = os.path.join(self.data_directory,path)
+    else:
+      raise ValueError("Could not find the data at the supplied location : ",os.path.join(self.data_directory,path))
+    return fpath
 
   def get_nuisance_parameters(self):
     # A simple function to check which nuisance parameters will need to be passed in the 'nuisance' dictionary
@@ -761,6 +825,10 @@ class lym1d():
       parameters.append('fSiII')
     if self.has_cor['norm']:
       parameters.append('normalization')
+    if 'amplgrad' in self.runmode:
+      parameters.append('invAmpl')
+      parameters.append('invGrad')
+    # This is where WDM nuisance could be added
     return parameters
 
   def taylor_tau_eff(self,z):
