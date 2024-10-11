@@ -315,7 +315,7 @@ class lym1d():
 
 
 
-  def chi2(self,cosmo,thermo_in,nuisance_in, add_prior=False):
+  def chi2(self,cosmo,thermo_in,nuisance_in, add_prior=False, only_prior=False):
     """
       Get the chi^2 by comparing data and observation. WITHOUT additional thermal/nuisance priors.
 
@@ -349,8 +349,8 @@ class lym1d():
 
     return chi_squared
 
-  def chi2_plus_prior(self, cosmo, thermo, nuisance):
-    return self.chi2(cosmo, thermo, nuisance, add_prior=True)
+  def chi2_plus_prior(self, cosmo, thermo, nuisance, only_prior=False):
+    return self.chi2(cosmo, thermo, nuisance, add_prior=True, only_prior=False)
 
   def convert_from_powerlaw(self, therm):
 
