@@ -198,7 +198,7 @@ class lym1d():
         self.log("   ".join(names)+"\n",level=3)
         self.log("   ".join(["{:.4g}".format(p) for p in pars])+"\n",level=3)
 
-  def get_flux_pk(self, iz, z, cosmo, therm, nuisance):
+  def get_flux_pk(self, iz, z, cosmo, therm, nuisance, only_prior=False):
     """
       Get the flux for a given redshift and given parameters. This is the UN-corrected flux pk directly from the emulator.
 
@@ -314,6 +314,23 @@ class lym1d():
     return self.data_pk
 
 
+  def only_check_prior(self,cosmo,therm,nuisance):
+    """
+      Only Check if the current parameters are within the prior range.
+      Args:
+        cosmo (dict: (str,float/function)): Dictionary of cosmological quantities, either values or functions of redshift
+        therm (dict: (str,float/function)): Dictionary of thermal quantities, either values or functions of redshift
+        nuisance (dict: (str,float/function)): Dictionary of nuisance quantities, either values or functions of redshift
+    """
+
+    for iz,z in enumerate(self.basis_z):
+      z = self.basis_z[iz]
+      if ( z >= self.zmin-self.epsilon_z and z <= self.zmax+self.epsilon_z):
+
+        in_prior = self.get_flux_pk(iz, z, cosmo, therm, nuisance, only_prior=True)
+        if in_prior is None:
+          return False
+    return True
 
   def chi2(self,cosmo,thermo_in,nuisance_in, add_prior=False, only_prior=False):
     """
