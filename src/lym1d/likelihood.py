@@ -208,6 +208,8 @@ class lym1d():
         cosmo (dict: (str,float/function)): Dictionary of cosmological quantities, either values or functions of redshift
         therm (dict: (str,float/function)): Dictionary of thermal quantities, either values or functions of redshift
         nuisance (dict: (str,float/function)): Dictionary of nuisance quantities, either values or functions of redshift
+        only_prior (bool): Only check if the parameters are within the prior range, but don't evaluate the emulator
+
     """
 
     # Convert from input notation to emulator notation
@@ -242,7 +244,10 @@ class lym1d():
       self.emu.in_bounds(params,z)
     except EmulatorOutOfBoundsException as e:
       self.log("(!) Emulator out of bounds :: "+str(e))
-      return None
+      return None    
+    else:
+      if only_prior:
+        return True
 
     # Get P^flux(k) from simulator
     #print(params,z)
@@ -346,19 +351,24 @@ class lym1d():
 
     nuisance = self.convert_to_functions(nuisance_in)
 
-    # 1) Get observed P^flux(k) from the emulator/theory
-    opk = self.get_obs_pk(cosmo,thermo,nuisance)
-    if opk is None:
-      return None
+    
+    if only_prior:
+      in_prior = self.only_check_prior(cosmo,thermo,nuisance)
+      chi_squared = (0 if in_prior else np.inf)
+    else:
+      # 1) Get observed P^flux(k) from the emulator/theory
+      opk = self.get_obs_pk(cosmo,thermo,nuisance)
+      if opk is None:
+        return None
 
-    # 2) Obtain the effective chi square as dP_i C^(-1)_ij dP_j
-    # Where the indices i,j run over BOTH redshift bins AND k bins
-    chi_squared = np.dot(np.hstack(self.data_pk)-np.hstack(self.theory_pk),  #dP_i
-                  np.dot(self.inv_covmat,                                    #C^(-1)_ij
-                         np.hstack(self.data_pk)-np.hstack(self.theory_pk))) #dP_j
+      # 2) Obtain the effective chi square as dP_i C^(-1)_ij dP_j
+      # Where the indices i,j run over BOTH redshift bins AND k bins
+      chi_squared = np.dot(np.hstack(self.data_pk)-np.hstack(self.theory_pk),  #dP_i
+                    np.dot(self.inv_covmat,                                    #C^(-1)_ij
+                          np.hstack(self.data_pk)-np.hstack(self.theory_pk))) #dP_j
 
-    if(chi_squared == None):
-      return None
+      if(chi_squared is None):
+        return None
 
     if add_prior==True:
       self.log("Chi-square before priors: {}".format(chi_squared),level=3)
@@ -367,7 +377,7 @@ class lym1d():
     return chi_squared
 
   def chi2_plus_prior(self, cosmo, thermo, nuisance, only_prior=False):
-    return self.chi2(cosmo, thermo, nuisance, add_prior=True, only_prior=False)
+    return self.chi2(cosmo, thermo, nuisance, add_prior=True, only_prior=only_prior)
 
   def convert_from_powerlaw(self, therm):
 
